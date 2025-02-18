@@ -1,5 +1,6 @@
 package su.nightexpress.excellentcrates.hologram;
 
+import com.github.Anon8281.universalScheduler.foliaScheduler.FoliaScheduler;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -88,35 +89,41 @@ public class HologramManager extends AbstractManager<CratesPlugin> {
         HologramData hologramData = this.hologramDataMap.get(crate.getId());
         if (hologramData == null || this.hidden.contains(crate.getId())) return;
 
-        double yOffset = crate.getHologramYOffset();
-        if (this.useDisplays) yOffset += 0.2;
 
         for (HologramEntity entity : hologramData.getEntities()) {
             WorldPos position = entity.position();
-            if (!position.isChunkLoaded()) return;
 
-            World world = position.getWorld();
-            Block block = position.toBlock();
-            if (world == null || block == null) return;
+            Location positionLocation = position.toLocation();
 
-            double height = block.getBoundingBox().getHeight() / 2D + yOffset;
-            Location location = LocationUtil.setCenter3D(block.getLocation()).add(0, height + entity.gap(), 0);
+            new FoliaScheduler(plugin).runTask(positionLocation, () -> {
+                if (!position.isChunkLoaded()) return;
 
-            Players.getOnline().forEach(player -> {
-                if (!CrateUtils.isInEffectRange(player, location)) {
-                    entity.removePlayer(player);
-                    this.handler.destroyEntity(player, Lists.newSet(entity.entityID()));
-                    return;
-                }
+                World world = position.getWorld();
+                Block block = position.toBlock();
+                if (world == null || block == null) return;
 
-                String text = Replacer.create().replace(crate.replacePlaceholders()).replacePlaceholderAPI(player).apply(entity.text());
+                double yOffset = crate.getHologramYOffset();
+                if (this.useDisplays) yOffset += 0.2;
 
-                boolean create = !entity.isCreated(player);
-                if (create) {
-                    entity.addPlayer(player);
-                }
+                double height = block.getBoundingBox().getHeight() / 2D + yOffset;
+                Location location = LocationUtil.setCenter3D(block.getLocation()).add(0, height + entity.gap(), 0);
 
-                this.sendHologramPackets(player, entity.entityID(), create, location, text);
+                Players.getOnline().forEach(player -> {
+                    if (!CrateUtils.isInEffectRange(player, location)) {
+                        entity.removePlayer(player);
+                        this.handler.destroyEntity(player, Lists.newSet(entity.entityID()));
+                        return;
+                    }
+
+                    String text = Replacer.create().replace(crate.replacePlaceholders()).replacePlaceholderAPI(player).apply(entity.text());
+
+                    boolean create = !entity.isCreated(player);
+                    if (create) {
+                        entity.addPlayer(player);
+                    }
+
+                    this.sendHologramPackets(player, entity.entityID(), create, location, text);
+                });
             });
         }
     }
